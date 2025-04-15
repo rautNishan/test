@@ -1,2 +1,9 @@
-console.log("This is nishan");
-console.log("Test");
+import { pool } from "./database/database.connection";
+
+pool.connect((err, client, release) => {
+  if (err) {
+    return console.error("Error acquiring client", err.stack);
+  }
+  console.log("Connected to the PostgreSQL database");
+  release();
+});
