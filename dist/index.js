@@ -41,11 +41,18 @@ const dotenv = __importStar(require("dotenv"));
 dotenv.config();
 const query_builter_1 = require("./builder/query.builter");
 const client = webzio_1.default.config({ token: process.env.WEBZIO_TOKEN });
-const builder = new query_builter_1.QueryBuilder("education")
-    .orLanguages("nepali")
-    .andLanguages("nepali3");
+const builder = new query_builter_1.QueryBuilder("Database")
+    .orLanguages("english")
+    .sentiment("POSITIVE")
+    .category("Education");
 const query = builder.build();
 console.log(query);
+client.query("newsApiLite", query).then((output) => {
+    console.log(output.posts[0]);
+    console.log(output.posts.length);
+    console.log(output.totalResults);
+    console.log(output.moreResultsAvailable);
+});
 // client.getNext().then((output) => {
 //   console.log("--------------------");
 //   console.log(output["posts"][0]["thread"]["site"]);
