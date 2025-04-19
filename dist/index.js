@@ -40,22 +40,36 @@ const webzio_1 = __importDefault(require("webzio"));
 const dotenv = __importStar(require("dotenv"));
 dotenv.config();
 const query_builter_1 = require("./builder/query.builter");
-const client = webzio_1.default.config({ token: process.env.WEBZIO_TOKEN });
-const builder = new query_builter_1.QueryBuilder("Database")
-    .orLanguages("english")
-    .sentiment("POSITIVE")
-    .category("Education");
-const query = builder.build();
-console.log(query);
-client.query("newsApiLite", query).then((output) => {
-    console.log(output.posts[0]);
-    console.log(output.posts.length);
-    console.log(output.totalResults);
-    console.log(output.moreResultsAvailable);
-});
+const database_queries_1 = require("./database/database.queries");
+//Since i was only getting 10 data at a time i am putting a lot of filter
+// const builder = new QueryBuilder("Database")
+//   .orLanguages("english")
+//   .sentiment("POSITIVE")
+//   .category("Education");
+// const query = builder.build();
+// console.log(query);
 // client.getNext().then((output) => {
 //   console.log("--------------------");
 //   console.log(output["posts"][0]["thread"]["site"]);
 //   console.log(output["posts"][0]["published"]);
 // });
+async function main() {
+    try {
+        const client = webzio_1.default.config({ token: process.env.WEBZIO_TOKEN });
+        await (0, database_queries_1.migration)();
+        const builder = new query_builter_1.QueryBuilder("database")
+            .orLanguages("english")
+            .sentiment("POSITIVE")
+            .category("Education");
+        const query = builder.build();
+        console.log(query);
+        const data = await client.query("newsApiLite", query);
+        console.log("This is data: ", data.posts[0].entities);
+    }
+    catch (error) {
+        console.log("This is error: ", error);
+        throw error;
+    }
+}
+main();
 //# sourceMappingURL=index.js.map

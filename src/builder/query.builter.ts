@@ -2,7 +2,7 @@
 // https://docs.webz.io/reference/output
 // https://docs.webz.io/reference/news-api-lite (Limitations section)
 
-import { IQueryBuilder } from "./interfaces/builder.interface";
+import { IQuery, IQueryBuilder } from "./interfaces/builder.interface";
 
 //This query builder will only build query on Post Object and only searchable sections mention on (https://docs.webz.io/reference/filters)
 
@@ -279,7 +279,7 @@ export class QueryBuilder implements IQueryBuilder {
     return this;
   }
 
-  public build() {
+  public build(): IQuery {
     if (this.lang) {
       this.lang = `(${this.lang})`; //Make sure to close in bracket at final
       this.filters.push(this.lang);
