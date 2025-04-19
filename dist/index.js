@@ -41,30 +41,63 @@ const dotenv = __importStar(require("dotenv"));
 dotenv.config();
 const query_builter_1 = require("./builder/query.builter");
 const database_queries_1 = require("./database/database.queries");
-//Since i was only getting 10 data at a time i am putting a lot of filter
-// const builder = new QueryBuilder("Database")
-//   .orLanguages("english")
-//   .sentiment("POSITIVE")
-//   .category("Education");
-// const query = builder.build();
-// console.log(query);
-// client.getNext().then((output) => {
-//   console.log("--------------------");
-//   console.log(output["posts"][0]["thread"]["site"]);
-//   console.log(output["posts"][0]["published"]);
-// });
+async function fetchRecursively(query, webzClient) {
+    let pageNumber = 1;
+    /**
+     * @lastCursorTillNow and @checkPointNextUrl is if servers goes down while migrating the data
+     */
+    let lastCursorTillNow = "";
+    let checkPointNextUrl = "";
+    try {
+        // Initial query
+        let data = await webzClient.query("newsApiLite", query);
+        console.log(data.totalResults);
+        lastCursorTillNow = data.posts[data.posts.length - 1].uuid;
+        checkPointNextUrl = data.next;
+        console.log(data.posts[0].thread);
+        let totalFetched = data.posts.length;
+        console.log(`Page ${pageNumber}: Got ${data.posts.length} posts`);
+        while (data.moreResultsAvailable > 0) {
+            // Wait a moment to avoid rate limiting
+            //https://docs.webz.io/reference/errors
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+            data = await webzClient.getNext();
+            lastCursorTillNow = data.posts[data.posts.length - 1].uuid;
+            checkPointNextUrl = data.next;
+            pageNumber++;
+            //Increment the total fetched
+            totalFetched += data.posts.length;
+            console.log(`Page ${pageNumber}: Got ${data.posts.length} posts.`);
+            // Break if we get an empty page or if something is wrong
+            if (data.posts.length === 0) {
+                console.log("No more posts returned, breaking loop");
+                console.log("Check point with next URL: ");
+                break;
+            }
+        }
+        console.log(`Finisuhed fetching. Total posts: ${totalFetched} out of ${data.totalResults}`);
+    }
+    catch (error) {
+        //This means server was good until some point
+        if (pageNumber > 1) {
+            console.log(`Some thing wrong with server, the last cursor was: ` +
+                lastCursorTillNow);
+        }
+        throw error;
+    }
+}
+async function saveIntoDataBase(data) { }
 async function main() {
     try {
         const client = webzio_1.default.config({ token: process.env.WEBZIO_TOKEN });
+        //Create necessay relations
         await (0, database_queries_1.migration)();
+        //Webzio Query
         const builder = new query_builter_1.QueryBuilder("database")
             .orLanguages("english")
             .sentiment("POSITIVE")
             .category("Education");
-        const query = builder.build();
-        console.log(query);
-        const data = await client.query("newsApiLite", query);
-        console.log("This is data: ", data.posts[0].entities);
+        fetchRecursively(builder.build(), client);
     }
     catch (error) {
         console.log("This is error: ", error);

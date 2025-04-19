@@ -16,6 +16,9 @@ export class QueryBuilder implements IQueryBuilder {
   private size: number = 10; //default value
   private text: string;
   private siteType: string;
+  private order: string = "asc";
+  private sort: string;
+  private from: number;
 
   constructor(q: string) {
     this.q = q;
@@ -279,6 +282,21 @@ export class QueryBuilder implements IQueryBuilder {
     return this;
   }
 
+  public sortOrder(order: "asc" | "desc") {
+    this.order = order;
+    return this;
+  }
+
+  public sortBy(sortBy: "relevancy" | "published" | "replies_count") {
+    this.sort = sortBy;
+    return this;
+  }
+
+  public andForm(from: number) {
+    this.from = from;
+    return this;
+  }
+
   public build(): IQuery {
     if (this.lang) {
       this.lang = `(${this.lang})`; //Make sure to close in bracket at final
@@ -296,6 +314,12 @@ export class QueryBuilder implements IQueryBuilder {
     }
 
     const filter = this.filters.map((filter) => filter).join(" ");
-    return { q: filter, size: this.size };
+
+    const query: IQuery = { q: filter, size: this.size, order: this.order };
+    if (this.sort) {
+      query.sort = this.sort;
+    }
+
+    return query;
   }
 }

@@ -27,13 +27,15 @@ export interface IQueryBuilder {
 
   category(category: string): this;
 
-  build(): {
-    q: string;
-    size: number;
-  };
+  build(): IQuery;
 }
 
 export interface IQuery {
   q: string;
   size: number;
+  order?: string;
+  sort?: string;
+  ni?: string;
+  ns?: string;
+  from?: number;
 }
