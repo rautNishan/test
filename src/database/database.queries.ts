@@ -72,7 +72,7 @@ export async function migration() {
   }
 }
 
-export async function insertIntoThreads(data: IThread, client: any) {
+export async function insertOrUpdateThread(data: IThread, client: any) {
   try {
     const query = `
         INSERT INTO threads (
@@ -84,6 +84,26 @@ export async function insertIntoThreads(data: IThread, client: any) {
         VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20
         )
+        ON CONFLICT (uuid) DO UPDATE SET
+        url = $2,
+        site_full = $3,
+        site = $4,
+        site_section = $5,
+        section_title = $6,
+        site_title = $7,
+        title = $8,
+        title_full = $9,
+        published = $10,
+        replies_count = $11,
+        participants_count = $12,
+        site_type = $13,
+        main_image = $14,
+        country = $15,
+        site_categories = $16,
+        social = $17,
+        performance_score = $18,
+        domain_rank = $19,
+        domain_rank_updated = $20
         `;
 
     const values = [
@@ -114,7 +134,7 @@ export async function insertIntoThreads(data: IThread, client: any) {
   }
 }
 
-export async function insertIntoPost(data: IPost, client: any) {
+export async function insertOrUpdatePost(data: IPost, client: any) {
   try {
     const query = `
         INSERT INTO posts (
@@ -127,7 +147,34 @@ export async function insertIntoPost(data: IPost, client: any) {
         VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
           $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27
-        )
+        )  
+        ON CONFLICT (uuid) DO UPDATE SET
+        thread_uuid = $2,
+        parent_url = $3,
+        ord_in_thread = $4,
+        author = $5,
+        published = $6,
+        title = $7,
+        text = $8,
+        highlightText = $9,
+        highlightTitle = $10,
+        highlightThreadTitle = $11,
+        language = $12,
+        sentiment = $13,
+        categories = $14,
+        topics = $15,
+        ai_allow = $16,
+        has_canonical = $17,
+        webz_reporter = $18,
+        external_links = $19,
+        external_images = $20,
+        entities = $21,
+        syndication = $22,
+        trust = $23,
+        rating = $24,
+        crawled = $25,
+        updated = $26,
+        url = $27  
       `;
 
     const values = [

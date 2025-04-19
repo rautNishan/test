@@ -1,5 +1,8 @@
 import { IQuery } from "./builder/interfaces/builder.interface";
-import { insertIntoPost, insertIntoThreads } from "./database/database.queries";
+import {
+  insertOrUpdatePost,
+  insertOrUpdateThread,
+} from "./database/database.queries";
 import { IWebzio } from "./interfaces/interfaces";
 import { pool } from "./database/database.connection";
 
@@ -15,8 +18,7 @@ export async function fetchRecursively(query: IQuery, webzClient: any) {
   try {
     // Initial query
     let data: IWebzio = await webzClient.query("newsApiLite", query);
-    console.log(data.totalResults);
-    console.log("available reasults: ", data.moreResultsAvailable);
+    
     lastCursorTillNow = data.posts[data.posts.length - 1].uuid;
     checkPointNextUrl = data.next;
 
@@ -31,28 +33,35 @@ export async function fetchRecursively(query: IQuery, webzClient: any) {
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
       data = await webzClient.getNext();
-      console.log("available reasults: ", data.moreResultsAvailable);
-
-      lastCursorTillNow = data.posts[data.posts.length - 1].uuid;
-      checkPointNextUrl = data.next;
-      pageNumber++;
-      //Increment the total fetched
-      totalFetched += data.posts.length;
-      console.log(`Page ${pageNumber}: Got ${data.posts.length} posts.`);
-      await saveIntoDataBase(data);
-      console.log(`Saved batch till: ${lastCursorTillNow}`);
       // Break if we get an empty page or if something is wrong
       //And availabe result was not correct
       if (data.posts.length === 0) {
         console.log("No more posts returned, breaking loop");
-        console.log("Check point with next URL: ");
         break;
       }
+
+      lastCursorTillNow = data.posts[data.posts.length - 1].uuid;
+      checkPointNextUrl = data.next;
+      pageNumber++;
+      totalFetched += data.posts.length;
+
+      console.log(`Page ${pageNumber}: Got ${data.posts.length} posts.`);
+      await saveIntoDataBase(data);
+      console.log(`Saved batch till: ${lastCursorTillNow}`);
     }
 
     console.log(
-      `Finisuhed fetching. Total posts: ${totalFetched} out of ${data.totalResults}`
+      `Finisuhed fetching. Total posts fetched: ${totalFetched} out of ${data.totalResults}`
     );
+    console.log(
+      `If Total posts fetched ${totalFetched} is greater than total post ${data.totalResults} there might be some duplicate. Check db to confirm.`
+    );
+    console.log(`Final meta : `, {
+      availableTotalPost: data.totalResults,
+      totalFetched: totalFetched,
+      warnings: data.warnings,
+      queryToApi: query,
+    });
   } catch (error) {
     //This means server was good until some point
     if (pageNumber > 1) {
@@ -77,14 +86,14 @@ async function saveIntoDataBase(data: IWebzio) {
       const thread = post.thread;
       const threadUuid = thread.uuid;
 
-      // Insert thread
-      await insertIntoThreads(thread, client);
+      // Insert thread or update if existing uuid found
+      await insertOrUpdateThread(thread, client);
 
-      // Insert post with thread_uuid
-      await insertIntoPost({ ...post, thread_uuid: threadUuid }, client);
+      // Insert post  or update if existing found
+      await insertOrUpdatePost({ ...post, thread_uuid: threadUuid }, client);
     }
-
     await client.query("commit");
+    console.log("Completed saving threads and post in database");
   } catch (error) {
     await client.query("rollback");
     throw error;
