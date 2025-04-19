@@ -39,7 +39,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const webzio_1 = __importDefault(require("webzio"));
 const dotenv = __importStar(require("dotenv"));
 dotenv.config();
-const query_builter_1 = require("./builder/query.builter");
+const query_builder_1 = require("./builder/query.builder");
 const database_queries_1 = require("./database/database.queries");
 const database_connection_1 = require("./database/database.connection");
 async function fetchRecursively(query, webzClient) {
@@ -126,7 +126,7 @@ async function main() {
         //Create necessay relations
         await (0, database_queries_1.migration)();
         //Webzio Query
-        const builder = new query_builter_1.QueryBuilder("database")
+        const builder = new query_builder_1.QueryBuilder("database")
             .orLanguages("english")
             .sentiment("POSITIVE")
             .category("Education");

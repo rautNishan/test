@@ -1,7 +1,7 @@
 import webzio from "webzio";
 import * as dotenv from "dotenv";
 dotenv.config();
-import { QueryBuilder } from "./builder/query.builter";
+import { QueryBuilder } from "./builder/query.builder";
 import { IQuery, IQueryBuilder } from "./builder/interfaces/builder.interface";
 import {
   insertIntoPost,
