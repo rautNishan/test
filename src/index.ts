@@ -3,7 +3,11 @@ import * as dotenv from "dotenv";
 dotenv.config();
 import { QueryBuilder } from "./builder/query.builter";
 import { IQuery, IQueryBuilder } from "./builder/interfaces/builder.interface";
-import { insertIntoThreads, migration } from "./database/database.queries";
+import {
+  insertIntoPost,
+  insertIntoThreads,
+  migration,
+} from "./database/database.queries";
 import { IWebzio } from "./interfaces/interfaces";
 import { pool } from "./database/database.connection";
 
@@ -20,12 +24,14 @@ async function fetchRecursively(query: IQuery, webzClient: any) {
     // Initial query
     let data: IWebzio = await webzClient.query("newsApiLite", query);
     console.log(data.totalResults);
+    console.log("available reasults: ", data.moreResultsAvailable);
     lastCursorTillNow = data.posts[data.posts.length - 1].uuid;
     checkPointNextUrl = data.next;
-    console.log(data.posts[0].thread);
 
     let totalFetched = data.posts.length;
     console.log(`Page ${pageNumber}: Got ${data.posts.length} posts`);
+    await saveIntoDataBase(data);
+    console.log(`Saved batch till: ${lastCursorTillNow}`);
 
     while (data.moreResultsAvailable > 0) {
       // Wait a moment to avoid rate limiting
@@ -33,18 +39,21 @@ async function fetchRecursively(query: IQuery, webzClient: any) {
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
       data = await webzClient.getNext();
+      console.log("available reasults: ", data.moreResultsAvailable);
+
       lastCursorTillNow = data.posts[data.posts.length - 1].uuid;
       checkPointNextUrl = data.next;
       pageNumber++;
       //Increment the total fetched
       totalFetched += data.posts.length;
       console.log(`Page ${pageNumber}: Got ${data.posts.length} posts.`);
-
+      await saveIntoDataBase(data);
+      console.log(`Saved batch till: ${lastCursorTillNow}`);
       // Break if we get an empty page or if something is wrong
+      //And availabe result was not correct
       if (data.posts.length === 0) {
         console.log("No more posts returned, breaking loop");
         console.log("Check point with next URL: ");
-
         break;
       }
     }
@@ -59,6 +68,8 @@ async function fetchRecursively(query: IQuery, webzClient: any) {
         `Some thing wrong with server, the last cursor was: ` +
           lastCursorTillNow
       );
+      console.log(`If you wish to continue with last next url: `+checkPointNextUrl);
+      
     }
     throw error;
   }
@@ -66,7 +77,7 @@ async function fetchRecursively(query: IQuery, webzClient: any) {
 
 //This function will save in batches (how much we get in one pagination result)
 async function saveIntoDataBase(data: IWebzio) {
-  const client = pool.connect();
+  const client = await pool.connect();
   await client.query("begin transaction"); //Since threads and post are related
   try {
     //For Thread
@@ -74,9 +85,19 @@ async function saveIntoDataBase(data: IWebzio) {
       await insertIntoThreads(data.posts[i].thread, client);
     }
 
-    await client.query('COMMIT');
+    for (let i = 0; i < data.posts.length; i++) {
+      await insertIntoPost(
+        {
+          ...data.posts[i],
+          thread_uuid: data.posts[i].thread.uuid,
+        },
+        client
+      );
+    }
+    //For post
+    await client.query("COMMIT");
   } catch (error) {
-    await client.query('rollback;');
+    await client.query("rollback;");
     throw error;
   } finally {
     client.release();

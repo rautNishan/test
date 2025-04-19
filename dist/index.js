@@ -41,6 +41,7 @@ const dotenv = __importStar(require("dotenv"));
 dotenv.config();
 const query_builter_1 = require("./builder/query.builter");
 const database_queries_1 = require("./database/database.queries");
+const database_connection_1 = require("./database/database.connection");
 async function fetchRecursively(query, webzClient) {
     let pageNumber = 1;
     /**
@@ -52,23 +53,29 @@ async function fetchRecursively(query, webzClient) {
         // Initial query
         let data = await webzClient.query("newsApiLite", query);
         console.log(data.totalResults);
+        console.log("available reasults: ", data.moreResultsAvailable);
         lastCursorTillNow = data.posts[data.posts.length - 1].uuid;
         checkPointNextUrl = data.next;
-        console.log(data.posts[0].thread);
         let totalFetched = data.posts.length;
         console.log(`Page ${pageNumber}: Got ${data.posts.length} posts`);
+        await saveIntoDataBase(data);
+        console.log(`Saved batch till: ${lastCursorTillNow}`);
         while (data.moreResultsAvailable > 0) {
             // Wait a moment to avoid rate limiting
             //https://docs.webz.io/reference/errors
             await new Promise((resolve) => setTimeout(resolve, 1000));
             data = await webzClient.getNext();
+            console.log("available reasults: ", data.moreResultsAvailable);
             lastCursorTillNow = data.posts[data.posts.length - 1].uuid;
             checkPointNextUrl = data.next;
             pageNumber++;
             //Increment the total fetched
             totalFetched += data.posts.length;
             console.log(`Page ${pageNumber}: Got ${data.posts.length} posts.`);
+            await saveIntoDataBase(data);
+            console.log(`Saved batch till: ${lastCursorTillNow}`);
             // Break if we get an empty page or if something is wrong
+            //And availabe result was not correct
             if (data.posts.length === 0) {
                 console.log("No more posts returned, breaking loop");
                 console.log("Check point with next URL: ");
@@ -82,11 +89,37 @@ async function fetchRecursively(query, webzClient) {
         if (pageNumber > 1) {
             console.log(`Some thing wrong with server, the last cursor was: ` +
                 lastCursorTillNow);
+            console.log(`If you wish to continue with last next url: ` + checkPointNextUrl);
         }
         throw error;
     }
 }
-async function saveIntoDataBase(data) { }
+//This function will save in batches (how much we get in one pagination result)
+async function saveIntoDataBase(data) {
+    const client = await database_connection_1.pool.connect();
+    await client.query("begin transaction"); //Since threads and post are related
+    try {
+        //For Thread
+        for (let i = 0; i < data.posts.length; i++) {
+            await (0, database_queries_1.insertIntoThreads)(data.posts[i].thread, client);
+        }
+        for (let i = 0; i < data.posts.length; i++) {
+            await (0, database_queries_1.insertIntoPost)({
+                ...data.posts[i],
+                thread_uuid: data.posts[i].thread.uuid,
+            }, client);
+        }
+        //For post
+        await client.query("COMMIT");
+    }
+    catch (error) {
+        await client.query("rollback;");
+        throw error;
+    }
+    finally {
+        client.release();
+    }
+}
 async function main() {
     try {
         const client = webzio_1.default.config({ token: process.env.WEBZIO_TOKEN });
